@@ -40,14 +40,9 @@ pipeline {
                 sh '''
                 docker run --rm \
                   -v $WORKSPACE:/app \
-                  -w /app \
+                  -w /app/app \
                   node:18 \
-                  sh -c "
-                    DIR=$(dirname $(find . -name package.json | head -n 1)) && \
-                    cd $DIR && \
-                    npm install && \
-                    npm test
-                  "
+                  sh -c "ls -la && npm install && npm test"
                 '''
             }
         }

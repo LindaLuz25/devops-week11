@@ -51,28 +51,19 @@ pipeline {
 
         stage('Deploy Monitoring Stack') {
             steps {
-                echo "🚀 Desplegando Node app, Prometheus y Grafana con Docker Compose..."
+                echo "🚀 Desplegando Node app, Prometheus y Grafana con Docker Compose dentro de contenedor..."
                 sh """
-                # Aseguramos que docker-compose.yml esté disponible
-                mkdir -p ${WORKSPACE}/app
-                if [ ! -f ${WORKSPACE}/app/docker-compose.yml ]; then
-                    cp ${WORKSPACE}/docker-compose.yml ${WORKSPACE}/app/docker-compose.yml
-                fi
-
-                # Deploy usando docker/compose dentro de contenedor
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
                     -v ${WORKSPACE}:/workspace \
                     -w /workspace/app \
-                    docker/compose:latest \
-                    -f /workspace/app/docker-compose.yml down || true
+                    docker/compose:latest down || true
 
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
                     -v ${WORKSPACE}:/workspace \
                     -w /workspace/app \
-                    docker/compose:latest \
-                    -f /workspace/app/docker-compose.yml up -d
+                    docker/compose:latest up -d
                 """
             }
         }

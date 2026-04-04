@@ -69,17 +69,17 @@ pipeline {
                 echo "📂 Contenido de app/"
                 ls -la ${WORKSPACE}/app
 
-                # Ejecutar Docker Compose dentro del contenedor
+                # Ejecutar Docker Compose dentro del contenedor montando solo app/
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v ${WORKSPACE}:/workspace \
-                    -w /workspace/app \
+                    -v ${WORKSPACE}/app:/app \
+                    -w /app \
                     docker/compose:latest down || true
 
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v ${WORKSPACE}:/workspace \
-                    -w /workspace/app \
+                    -v ${WORKSPACE}/app:/app \
+                    -w /app \
                     docker/compose:latest up -d
                 """
             }

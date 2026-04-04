@@ -24,7 +24,7 @@ pipeline {
                   -v $WORKSPACE:/app \
                   -w /app/app \
                   node:18 \
-                  sh -c "npm install && npm test"
+                  sh -c "find /app -name package.json && cd $(dirname $(find /app -name package.json | head -n 1)) && npm install && npm test"
                 '''
             }
         }

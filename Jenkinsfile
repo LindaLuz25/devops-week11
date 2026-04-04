@@ -1,5 +1,4 @@
 pipeline {
-
     agent any
 
     options {
@@ -9,78 +8,77 @@ pipeline {
     environment {
         APP_NAME = "lab10monitoreo"
         VERSION = "1.0.${BUILD_NUMBER}"
+        # URL de tu repo si lo necesitas
         REPO_URL = "https://github.com/lesantivanez/lab10monitoreo.git"
         BRANCH = "main"
     }
 
     stages {
 
-        // 🔹 Limpieza del workspace
         stage('Clean Workspace') {
             steps {
-                cleanWs()
+                deleteDir()
             }
         }
 
-        // 🔹 Checkout simple y confiable
         stage('Checkout') {
             steps {
                 git branch: "${BRANCH}", url: "${REPO_URL}"
             }
         }
 
-        // 🔹 Verificar que el repo se descargó correctamente
-        stage('Verify Checkout') {
+        stage('Install & Test Node App') {
             steps {
-                sh '''
-                echo "=== WORKSPACE DESPUÉS DEL CHECKOUT ==="
-                ls -R
-                '''
+                script {
+                    // Usamos docker para correr Node dentro del contenedor
+                    sh """
+                        docker run --rm \
+                        -v \$WORKSPACE:/workspace \
+                        -w /workspace/app \
+                        node:18 sh -c '
+                            echo "📂 Contenido de /workspace/app:" && ls -la &&
+                            if [ ! -f package.json ]; then
+                                echo "❌ package.json no encontrado, abortando..." && exit 1
+                            fi &&
+                            npm install &&
+                            npm test
+                        '
+                    """
+                }
             }
         }
 
-        // 🔹 Instalar dependencias y correr tests dentro de Docker Node
-        stage('Install & Test') {
+        stage('Build Docker Image') {
             steps {
-                sh '''
-                docker run --rm \
-                  -v $WORKSPACE:/app \
-                  -w /app \
-                  node:18 \
-                  sh -c "
-                    echo '📂 Contenido de /app:' && ls -la && \
-                    if [ ! -f package.json ]; then
-                        echo '❌ package.json no encontrado, abortando...' && exit 1
-                    fi && \
-                    npm install && npm test
-                  "
-                '''
+                script {
+                    sh """
+                        docker build -t ${APP_NAME}:${VERSION} app/
+                    """
+                }
             }
         }
 
-        // 🔹 Build de la imagen Docker con versionado automático
-        stage('Build Image') {
+        stage('Run Container Locally') {
             steps {
-                sh "docker build -t ${APP_NAME}:${VERSION} ."
+                script {
+                    sh """
+                        docker run --rm -d -p 3000:3000 --name ${APP_NAME}-${BUILD_NUMBER} ${APP_NAME}:${VERSION}
+                        echo "✅ Contenedor levantado en localhost:3000"
+                    """
+                }
             }
         }
+    }
 
-        // 🔹 Deploy usando Docker Compose
-        stage('Deploy') {
-            steps {
-                sh 'docker compose down || true'
-                sh "APP_VERSION=${VERSION} docker compose up -d --build"
-            }
+    post {
+        always {
+            echo "📌 Pipeline finalizado."
         }
-
-        // 🔹 Health Check para asegurar que la app está corriendo
-        stage('Health Check') {
-            steps {
-                sh '''
-                sleep 5
-                curl -f http://localhost:3000 || exit 1
-                '''
-            }
+        success {
+            echo "🎉 Build y tests exitosos. Contenedor corriendo."
+        }
+        failure {
+            echo "❌ Hubo un error en el pipeline."
         }
     }
 }

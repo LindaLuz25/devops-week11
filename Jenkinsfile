@@ -58,12 +58,12 @@ pipeline {
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         -v ${WORKSPACE}/app:/app -w /app \
-                        docker/compose:latest down || true
+                        docker/compose:latest docker compose down || true
 
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         -v ${WORKSPACE}/app:/app -w /app \
-                        docker/compose:latest up -d
+                        docker/compose:latest docker compose up -d
                     """
                 }
             }
@@ -91,7 +91,7 @@ pipeline {
                     echo "Node App:" && curl -s -I http://localhost:3000 | head -n 1
                     echo "Prometheus:" && curl -s -I http://localhost:9090 | head -n 1
                     echo "Grafana:" && curl -s -I http://localhost:3001 | head -n 1
-                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}/app:/app -w /app docker/compose:latest ps
+                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}/app:/app -w /app docker/compose:latest docker compose ps
                     '''
                 }
             }

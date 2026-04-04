@@ -38,6 +38,9 @@ pipeline {
         stage('Install & Test') {
             steps {
                 sh '''
+                echo "=== DEBUG ==="
+                ls -la
+                
                 docker run --rm \
                   -v $WORKSPACE:/app \
                   -w /app/app \

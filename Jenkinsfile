@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     options {
-        skipDefaultCheckout(true)
+        skipDefaultCheckout(false) // necesitamos el repo completo
+        timeout(time: 20, unit: 'MINUTES')
     }
 
     environment {
@@ -10,6 +11,7 @@ pipeline {
         VERSION = "1.0.${BUILD_NUMBER}"
         REPO_URL = "https://github.com/lesantivanez/lab10monitoreo.git"
         BRANCH = "main"
+        APP_PORT = "3000"
     }
 
     stages {
@@ -26,22 +28,30 @@ pipeline {
             }
         }
 
+        stage('Debug Workspace') {
+            steps {
+                echo "🔍 Contenido de la carpeta app:"
+                sh 'ls -la $WORKSPACE/app'
+            }
+        }
+
         stage('Install & Test Node App') {
             steps {
                 script {
-                    // Usamos docker para correr Node dentro del contenedor
                     sh """
-                        docker run --rm \
-                        -v /var/jenkins_home/workspace/monitoreo:/workspace \
-                        -w /workspace/app \
-                        node:18 sh -c "
-                            echo '📂 Contenido de /workspace/app:' && ls -la &&
-                            if [ ! -f package.json ]; then
-                                echo '❌ package.json no encontrado, abortando...' && exit 1
-                            fi &&
-                            npm install &&
-                            npm test
-                        "
+                    docker run --rm \\
+                        -v \$WORKSPACE/app:/app \\
+                        -w /app \\
+                        node:18 sh -c '
+                        echo "📂 Contenido de /app:" && ls -la &&
+                        if [ ! -f package.json ]; then
+                            echo "❌ package.json no encontrado, abortando..." && exit 1
+                        fi &&
+                        echo "📦 Instalando dependencias..." &&
+                        npm install &&
+                        echo "🧪 Ejecutando tests..." &&
+                        npm test
+                    '
                     """
                 }
             }
@@ -51,7 +61,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                        docker build -t ${APP_NAME}:${VERSION} app/
+                    docker build -t ${APP_NAME}:${VERSION} app/
                     """
                 }
             }
@@ -61,8 +71,26 @@ pipeline {
             steps {
                 script {
                     sh """
-                        docker run --rm -d -p 3000:3000 --name ${APP_NAME}-${BUILD_NUMBER} ${APP_NAME}:${VERSION}
-                        echo "✅ Contenedor levantado en localhost:3000"
+                    docker run -d -p ${APP_PORT}:${APP_PORT} --name ${APP_NAME}-${BUILD_NUMBER} ${APP_NAME}:${VERSION}
+                    sleep 5
+                    # Health check simple
+                    if curl -s http://localhost:${APP_PORT} | grep -q 'App running'; then
+                        echo "✅ App corriendo correctamente en localhost:${APP_PORT}"
+                    else
+                        echo "❌ La app no respondió correctamente"
+                        docker logs ${APP_NAME}-${BUILD_NUMBER}
+                        exit 1
+                    fi
+                    """
+                }
+            }
+        }
+
+        stage('Cleanup Old Containers') {
+            steps {
+                script {
+                    sh """
+                    docker ps -a --filter "name=${APP_NAME}-" --format '{{.ID}}' | xargs -r docker rm -f
                     """
                 }
             }
@@ -80,4 +108,5 @@ pipeline {
             echo "❌ Hubo un error en el pipeline."
         }
     }
+}
 }

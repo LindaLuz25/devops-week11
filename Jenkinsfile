@@ -21,8 +21,8 @@ pipeline {
             steps {
                 sh '''
                 docker run --rm \
-                  -v $(pwd):/app \
-                  -w /app \
+                  -v $WORKSPACE:/app \
+                  -w /app/app \
                   node:18 \
                   sh -c "npm install && npm test"
                 '''

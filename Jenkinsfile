@@ -53,19 +53,17 @@ pipeline {
         stage('Deploy Monitoring Stack') {
             steps {
                 echo "🚀 Desplegando Node app, Prometheus y Grafana con Docker Compose en contenedor..."
-                dir("${APP_DIR}") {
-                    sh """
-                    docker run --rm \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v ${WORKSPACE}/app:/app -w /app \
-                        docker/compose:latest -f docker-compose.yml down || true
+                sh """
+                docker run --rm \
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    -v ${WORKSPACE}:/workspace -w /workspace/app \
+                    docker/compose:latest -f docker-compose.yml down || true
 
-                    docker run --rm \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v ${WORKSPACE}/app:/app -w /app \
-                        docker/compose:latest -f docker-compose.yml up -d
-                    """
-                }
+                docker run --rm \
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    -v ${WORKSPACE}:/workspace -w /workspace/app \
+                    docker/compose:latest -f docker-compose.yml up -d
+                """
             }
         }
 
@@ -86,14 +84,12 @@ pipeline {
         stage('Verify Monitoring Services') {
             steps {
                 echo "🔍 Verificando servicios Node, Prometheus y Grafana..."
-                dir("${APP_DIR}") {
-                    sh '''
-                    echo "Node App:" && curl -s -I http://localhost:3000 | head -n 1
-                    echo "Prometheus:" && curl -s -I http://localhost:9090 | head -n 1
-                    echo "Grafana:" && curl -s -I http://localhost:3001 | head -n 1
-                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}/app:/app -w /app docker/compose:latest -f docker-compose.yml ps
-                    '''
-                }
+                sh '''
+                echo "Node App:" && curl -s -I http://localhost:3000 | head -n 1
+                echo "Prometheus:" && curl -s -I http://localhost:9090 | head -n 1
+                echo "Grafana:" && curl -s -I http://localhost:3001 | head -n 1
+                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace/app docker/compose:latest -f docker-compose.yml ps
+                '''
             }
         }
 

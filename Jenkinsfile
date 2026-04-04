@@ -4,7 +4,6 @@ pipeline {
     environment {
         APP_NAME = "node_app"
         APP_VERSION = "1.0.${BUILD_NUMBER}"
-        APP_DIR = "app"
     }
 
     options {
@@ -24,10 +23,27 @@ pipeline {
             }
         }
 
+        stage('Prepare Compose File') {
+            steps {
+                echo "📂 Asegurando docker-compose.yml en /app..."
+                sh """
+                    mkdir -p ${WORKSPACE}/app
+                    if [ -f ${WORKSPACE}/docker-compose.yml ]; then
+                        cp ${WORKSPACE}/docker-compose.yml ${WORKSPACE}/app/
+                        echo "✅ docker-compose.yml copiado a app/"
+                    elif [ -f ${WORKSPACE}/app/docker-compose.yml ]; then
+                        echo "✅ docker-compose.yml ya existe en app/"
+                    else
+                        echo "❌ docker-compose.yml no encontrado, abortando pipeline" && exit 1
+                    fi
+                """
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 echo "🐳 Construyendo imagen Docker de la app..."
-                dir("${APP_DIR}") {
+                dir('app') {
                     sh "docker build -t ${APP_NAME}:${APP_VERSION} ."
                 }
             }
@@ -36,7 +52,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 echo "🧪 Ejecutando tests dentro del contenedor..."
-                dir("${APP_DIR}") {
+                dir('app') {
                     sh """
                     docker run --rm -w /app -e APP_VERSION=${APP_VERSION} ${APP_NAME}:${APP_VERSION} sh -c '
                         echo "📂 Contenido de /app:" && ls -la &&
@@ -56,49 +72,32 @@ pipeline {
                 sh """
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v ${WORKSPACE}/${APP_DIR}:/app -w /app \
+                    -v ${WORKSPACE}/app:/app \
+                    -w /app \
                     docker/compose:latest -f docker-compose.yml down || true
 
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v ${WORKSPACE}/${APP_DIR}:/app -w /app \
+                    -v ${WORKSPACE}/app:/app \
+                    -w /app \
                     docker/compose:latest -f docker-compose.yml up -d
                 """
             }
         }
 
-        stage('Wait for Node App') {
+        stage('Verify Deployment') {
             steps {
-                echo "⏳ Esperando que la app Node esté lista..."
-                timeout(time: 30, unit: 'SECONDS') {
-                    waitUntil {
-                        script {
-                            def status = sh(script: 'curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || true', returnStdout: true).trim()
-                            return status == "200"
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Verify Monitoring Services') {
-            steps {
-                echo "🔍 Verificando servicios Node, Prometheus y Grafana..."
-                sh '''
-                echo "Node App:" && curl -s -I http://localhost:3000 | head -n 1
-                echo "Prometheus:" && curl -s -I http://localhost:9090 | head -n 1
-                echo "Grafana:" && curl -s -I http://localhost:3001 | head -n 1
-                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}/${APP_DIR}:/app -w /app docker/compose:latest -f docker-compose.yml ps
-                '''
+                echo "🔍 Verificando contenedores en ejecución..."
+                sh "docker ps --filter 'name=node_app'"
+                sh "docker ps --filter 'name=prometheus'"
+                sh "docker ps --filter 'name=grafana'"
             }
         }
 
         stage('Check App Health') {
             steps {
-                echo "💚 Verificando healthcheck de Node app..."
-                sh """
-                docker inspect --format='{{.State.Health.Status}}' node_app || echo 'No healthcheck definido'
-                """
+                echo "💚 Verificando healthcheck de la app..."
+                sh "docker inspect --format='{{.State.Health.Status}}' node_app || echo 'No healthcheck definido'"
             }
         }
     }

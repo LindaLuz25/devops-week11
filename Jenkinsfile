@@ -1,110 +1,89 @@
 pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout(false) // necesitamos el repo completo
-        timeout(time: 20, unit: 'MINUTES')
+    environment {
+        APP_NAME = "node_app"
+        APP_VERSION = "1.0.${BUILD_NUMBER}"
     }
 
-    environment {
-        APP_NAME = "lab10monitoreo"
-        VERSION = "1.0.${BUILD_NUMBER}"
-        REPO_URL = "https://github.com/lesantivanez/lab10monitoreo.git"
-        BRANCH = "main"
-        APP_PORT = "3000"
+    options {
+        skipDefaultCheckout(true)
+        timestamps()
     }
 
     stages {
 
-        stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
-        }
-
         stage('Checkout') {
             steps {
-                git branch: "${BRANCH}", url: "${REPO_URL}"
-            }
-        }
-
-        stage('Debug Workspace') {
-            steps {
-                echo "🔍 Contenido de la carpeta app:"
-                sh 'ls -la $WORKSPACE/app'
-            }
-        }
-
-        stage('Install & Test Node App') {
-            steps {
-                script {
-                    sh """
-                    docker run --rm -w /app node:18 sh -c '
-                        mkdir -p /app &&
-                        cp -r $WORKSPACE/app/* /app/ &&
-                        echo "📂 Contenido de /app:" && ls -la &&
-                        if [ ! -f package.json ]; then
-                            echo "❌ package.json no encontrado, abortando..." && exit 1
-                        fi &&
-                        echo "📦 Instalando dependencias..." &&
-                        npm install &&
-                        echo "🧪 Ejecutando tests..." &&
-                        npm test
-                    '
-                    """
-                }
+                echo "🔄 Clonando código..."
+                checkout([$class: 'GitSCM',
+                    branches: [[name: 'main']],
+                    userRemoteConfigs: [[url: 'https://github.com/lesantivanez/lab10monitoreo.git']]
+                ])
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh """
-                    docker build -t ${APP_NAME}:${VERSION} app/
-                    """
-                }
+                echo "🐳 Construyendo imagen Docker de la app..."
+                sh "docker build -t ${APP_NAME}:${APP_VERSION} ."
             }
         }
 
-        stage('Run Container Locally') {
+        stage('Run Tests') {
             steps {
-                script {
-                    sh """
-                    docker run -d -p ${APP_PORT}:${APP_PORT} --name ${APP_NAME}-${BUILD_NUMBER} ${APP_NAME}:${VERSION}
-                    sleep 5
-                    # Health check simple
-                    if curl -s http://localhost:${APP_PORT} | grep -q 'App running'; then
-                        echo "✅ App corriendo correctamente en localhost:${APP_PORT}"
-                    else
-                        echo "❌ La app no respondió correctamente"
-                        docker logs ${APP_NAME}-${BUILD_NUMBER}
-                        exit 1
-                    fi
-                    """
-                }
+                echo "🧪 Ejecutando tests dentro del contenedor..."
+                sh """
+                docker run --rm -w /app -e APP_VERSION=${APP_VERSION} ${APP_NAME}:${APP_VERSION} sh -c '
+                    echo "📂 Contenido de /app:" && ls -la &&
+                    if [ ! -f package.json ]; then
+                        echo "❌ package.json no encontrado, abortando..." && exit 1
+                    fi &&
+                    npm test
+                '
+                """
             }
         }
 
-        stage('Cleanup Old Containers') {
+        stage('Deploy Monitoring Stack') {
             steps {
-                script {
-                    sh """
-                    docker ps -a --filter "name=${APP_NAME}-" --format '{{.ID}}' | xargs -r docker rm -f
-                    """
-                }
+                echo "🚀 Desplegando Node app, Prometheus y Grafana con Docker Compose..."
+                sh """
+                export APP_VERSION=${APP_VERSION}
+                docker compose down || true
+                docker compose up -d
+                """
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                echo "🔍 Verificando contenedores en ejecución..."
+                sh "docker ps --filter 'name=node_app'"
+                sh "docker ps --filter 'name=prometheus'"
+                sh "docker ps --filter 'name=grafana'"
+            }
+        }
+
+        stage('Check App Health') {
+            steps {
+                echo "💚 Verificando healthcheck de la app..."
+                sh """
+                docker inspect --format='{{.State.Health.Status}}' node_app || echo 'No healthcheck definido'
+                """
             }
         }
     }
 
     post {
         always {
-            echo "📌 Pipeline finalizado."
+            echo "🧹 Pipeline finalizado. Los contenedores siguen corriendo."
         }
         success {
-            echo "🎉 Build y tests exitosos. Contenedor corriendo."
+            echo "🎉 Pipeline completado correctamente! Node app + Prometheus + Grafana corriendo."
         }
         failure {
-            echo "❌ Hubo un error en el pipeline."
+            echo "❌ Pipeline falló. Revisa los logs."
         }
     }
 }

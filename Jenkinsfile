@@ -53,7 +53,6 @@ pipeline {
                 echo '📂 Preparando docker-compose.yml y desplegando stack...'
                 dir('app') {
                     sh '''
-                    # Verificar docker-compose.yml
                     if [ ! -f docker-compose.yml ]; then
                         echo "❌ docker-compose.yml no encontrado, abortando..." && exit 1
                     fi
@@ -64,6 +63,8 @@ pipeline {
                     docker-compose down -v || true
                     docker rm -f prometheus || true
                     docker volume prune -f
+
+                    # 🔥 ESTA LÍNEA FALTABA
                     docker-compose up -d --build --force-recreate
                     '''
                 }

@@ -62,7 +62,9 @@ pipeline {
                     ls -la
 
                     docker-compose down -v || true
-                    docker-compose up -d --build
+                    docker rm -f prometheus || true
+                    docker volume prune -f
+                    docker-compose up -d --build --force-recreate
                     '''
                 }
             }
@@ -72,6 +74,7 @@ pipeline {
             steps {
                 echo '🔍 Verificando contenedores en ejecución...'
                 sh """
+                ls -l app/prometheus_config/
                 # Verificar que los contenedores existen
                 docker ps --filter 'name=node_app' --format '{{.Names}}' | grep node_app || (echo '❌ node_app no está corriendo' && exit 1)
                 docker ps --filter 'name=prometheus' --format '{{.Names}}' | grep prometheus || (echo '❌ Prometheus no está corriendo' && exit 1)

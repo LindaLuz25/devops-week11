@@ -61,11 +61,8 @@ pipeline {
                     echo "📂 Contenido de app/:"
                     ls -la
 
-                    # Detener stack previo
-                    docker-compose down || true
-
-                    # Levantar stack Node + Prometheus + Grafana
-                    docker-compose up -d
+                    docker-compose down -v || true
+                    docker-compose up -d --build
                     '''
                 }
             }

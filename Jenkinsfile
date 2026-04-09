@@ -75,9 +75,12 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 echo "🔍 Verificando contenedores en ejecución..."
-                sh "docker ps --filter 'name=node_app'"
-                sh "docker ps --filter 'name=prometheus'"
-                sh "docker ps --filter 'name=grafana'"
+                sh """
+                # Verificar que los contenedores existen
+                docker ps --filter 'name=node_app' --format '{{.Names}}' | grep node_app || (echo '❌ node_app no está corriendo' && exit 1)
+                docker ps --filter 'name=prometheus' --format '{{.Names}}' | grep prometheus || (echo '❌ Prometheus no está corriendo' && exit 1)
+                docker ps --filter 'name=grafana' --format '{{.Names}}' | grep grafana || (echo '❌ Grafana no está corriendo' && exit 1)
+                """
             }
         }
 

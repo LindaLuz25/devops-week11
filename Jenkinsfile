@@ -49,6 +49,22 @@ pipeline {
             }
         }
 
+        stage('Debug Files') {
+            steps {
+                echo "🔍 Verificando archivos reales en Jenkins..."
+                sh """
+                echo "📂 Current dir:"
+                pwd
+                echo "📂 Contenido de app/:"
+                ls -la app
+                echo "📂 Contenido de prometheus_config:"
+                ls -la app/prometheus_config || echo "No existe carpeta"
+                echo "📄 Ver archivo:"
+                cat app/prometheus_config/prometheus.yml || echo "Archivo NO existe"
+                """
+            }
+        }
+
         stage('Deploy Monitoring Stack') {
             steps {
                 echo "📂 Preparando docker-compose.yml y desplegando stack..."
@@ -80,6 +96,17 @@ pipeline {
                 docker ps --filter 'name=node_app' --format '{{.Names}}' | grep node_app || (echo '❌ node_app no está corriendo' && exit 1)
                 docker ps --filter 'name=prometheus' --format '{{.Names}}' | grep prometheus || (echo '❌ Prometheus no está corriendo' && exit 1)
                 docker ps --filter 'name=grafana' --format '{{.Names}}' | grep grafana || (echo '❌ Grafana no está corriendo' && exit 1)
+                """
+            }
+        }
+
+        stage('Validate Prometheus File') {
+            steps {
+                sh """
+                if [ ! -f app/prometheus_config/prometheus.yml ]; then
+                    echo '❌ prometheus.yml NO existe en Jenkins'
+                    exit 1
+                fi
                 """
             }
         }

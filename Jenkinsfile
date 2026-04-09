@@ -62,7 +62,7 @@ pipeline {
 
                     docker-compose down -v || true
                     docker rm -f prometheus || true
-                    docker volume prune -f
+                    docker system prune -af || true
 
                     # 🔥 ESTA LÍNEA FALTABA
                     docker-compose up -d --build --force-recreate

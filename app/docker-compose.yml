@@ -16,7 +16,7 @@ services:
     image: prom/prometheus
     container_name: prometheus
     volumes:
-      - ${WORKSPACE}/app/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml:ro # Monta el archivo de configuración de Prometheus
+      - ./prometheus_config:/etc/prometheus # Monta el archivo de configuración de Prometheus
     ports:
       - "9090:9090"
     networks:

@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "node_app"
+        APP_NAME = 'node_app'
         APP_VERSION = "1.0.${BUILD_NUMBER}"
     }
 
@@ -12,10 +12,9 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                echo "🔄 Clonando código..."
+                echo '🔄 Clonando código...'
                 checkout([$class: 'GitSCM',
                     branches: [[name: 'main']],
                     userRemoteConfigs: [[url: 'https://github.com/lesantivanez/lab10monitoreo.git']]
@@ -25,7 +24,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo "🐳 Construyendo imagen Docker de la app..."
+                echo '🐳 Construyendo imagen Docker de la app...'
                 dir('app') {
                     sh "docker build -t ${APP_NAME}:${APP_VERSION} ."
                 }
@@ -34,7 +33,7 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                echo "🧪 Ejecutando tests dentro del contenedor..."
+                echo '🧪 Ejecutando tests dentro del contenedor...'
                 dir('app') {
                     sh """
                     docker run --rm -w /app -e APP_VERSION=${APP_VERSION} ${APP_NAME}:${APP_VERSION} sh -c '
@@ -49,27 +48,11 @@ pipeline {
             }
         }
 
-        stage('Debug Files') {
-            steps {
-                echo "🔍 Verificando archivos reales en Jenkins..."
-                sh """
-                echo "📂 Current dir:"
-                pwd
-                echo "📂 Contenido de app/:"
-                ls -la app
-                echo "📂 Contenido de prometheus_config:"
-                ls -la app/prometheus_config || echo "No existe carpeta"
-                echo "📄 Ver archivo:"
-                cat app/prometheus_config/prometheus.yml || echo "Archivo NO existe"
-                """
-            }
-        }
-
         stage('Deploy Monitoring Stack') {
             steps {
-                echo "📂 Preparando docker-compose.yml y desplegando stack..."
+                echo '📂 Preparando docker-compose.yml y desplegando stack...'
                 dir('app') {
-                    sh """
+                    sh '''
                     # Verificar docker-compose.yml
                     if [ ! -f docker-compose.yml ]; then
                         echo "❌ docker-compose.yml no encontrado, abortando..." && exit 1
@@ -83,14 +66,14 @@ pipeline {
 
                     # Levantar stack Node + Prometheus + Grafana
                     docker-compose up -d
-                    """
+                    '''
                 }
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                echo "🔍 Verificando contenedores en ejecución..."
+                echo '🔍 Verificando contenedores en ejecución...'
                 sh """
                 # Verificar que los contenedores existen
                 docker ps --filter 'name=node_app' --format '{{.Names}}' | grep node_app || (echo '❌ node_app no está corriendo' && exit 1)
@@ -111,9 +94,25 @@ pipeline {
             }
         }
 
+        stage('Debug Files') {
+            steps {
+                echo '🔍 Verificando archivos reales en Jenkins...'
+                sh '''
+                echo "📂 Current dir:"
+                pwd
+                echo "📂 Contenido de app/:"
+                ls -la app
+                echo "📂 Contenido de prometheus_config:"
+                ls -la app/prometheus_config || echo "No existe carpeta"
+                echo "📄 Ver archivo:"
+                cat app/prometheus_config/prometheus.yml || echo "Archivo NO existe"
+                '''
+            }
+        }
+
         stage('Check App Health') {
             steps {
-                echo "💚 Verificando healthcheck de la app..."
+                echo '💚 Verificando healthcheck de la app...'
                 sh """
                 docker inspect --format='{{.State.Health.Status}}' node_app || echo 'No healthcheck definido'
                 """
@@ -123,13 +122,13 @@ pipeline {
 
     post {
         always {
-            echo "🧹 Pipeline finalizado. Los contenedores siguen corriendo."
+            echo '🧹 Pipeline finalizado. Los contenedores siguen corriendo.'
         }
         success {
-            echo "🎉 Pipeline completado correctamente! Node app + Prometheus + Grafana corriendo."
+            echo '🎉 Pipeline completado correctamente! Node app + Prometheus + Grafana corriendo.'
         }
         failure {
-            echo "❌ Pipeline falló. Revisa los logs."
+            echo '❌ Pipeline falló. Revisa los logs.'
         }
     }
 }
